@@ -65,6 +65,7 @@
 # include "devices/src/ashtech.h"
 # include "devices/src/emlid_reach.h"
 # include "devices/src/mtk.h"
+# include "devices/src/nmea.h"
 #endif // CONSTRAINED_FLASH
 #include "devices/src/ubx.h"
 
@@ -80,7 +81,8 @@ typedef enum {
 	GPS_DRIVER_MODE_UBX,
 	GPS_DRIVER_MODE_MTK,
 	GPS_DRIVER_MODE_ASHTECH,
-	GPS_DRIVER_MODE_EMLIDREACH
+	GPS_DRIVER_MODE_EMLIDREACH,
+	GPS_DRIVER_MODE_NMEA
 } gps_driver_mode_t;
 
 /* struct for dynamic allocation of satellite info data */
@@ -297,6 +299,8 @@ GPS::GPS(const char *path, gps_driver_mode_t mode, GPSHelper::Interface interfac
 		case 3: _mode = GPS_DRIVER_MODE_ASHTECH; break;
 
 		case 4: _mode = GPS_DRIVER_MODE_EMLIDREACH; break;
+
+		case 5: _mode = GPS_DRIVER_MODE_NMEA; break;
 #endif // CONSTRAINED_FLASH
 		}
 	}
@@ -779,6 +783,10 @@ GPS::run()
 			case GPS_DRIVER_MODE_EMLIDREACH:
 				_helper = new GPSDriverEmlidReach(&GPS::callback, this, &_report_gps_pos, _p_report_sat_info);
 				break;
+
+				case GPS_DRIVER_MODE_NMEA:
+					_helper = new GPSDriverNMEA(&GPS::callback, this, &_report_gps_pos, _p_report_sat_info, heading_offset);
+					break;
 #endif // CONSTRAINED_FLASH
 
 			default:
@@ -886,6 +894,9 @@ GPS::run()
 					break;
 
 				case GPS_DRIVER_MODE_EMLIDREACH:
+					_mode = GPS_DRIVER_MODE_NMEA;
+					break;
+
 #endif // CONSTRAINED_FLASH
 					_mode = GPS_DRIVER_MODE_UBX;
 					px4_usleep(500000); // tried all possible drivers. Wait a bit before next round
@@ -949,6 +960,10 @@ GPS::print_status()
 		case GPS_DRIVER_MODE_EMLIDREACH:
 			PX4_INFO("protocol: EMLIDREACH");
 			break;
+
+			case GPS_DRIVER_MODE_NMEA:
+				PX4_INFO("protocol: NMEA");
+				break;
 #endif // CONSTRAINED_FLASH
 
 		default:
@@ -1120,7 +1135,7 @@ $ gps reset warm
 
 	PRINT_MODULE_USAGE_PARAM_STRING('i', "uart", "spi|uart", "GPS interface", true);
 	PRINT_MODULE_USAGE_PARAM_STRING('j', "uart", "spi|uart", "secondary GPS interface", true);
-	PRINT_MODULE_USAGE_PARAM_STRING('p', nullptr, "ubx|mtk|ash|eml", "GPS Protocol (default=auto select)", true);
+	PRINT_MODULE_USAGE_PARAM_STRING('p', nullptr, "ubx|mtk|ash|eml|nmea", "GPS Protocol (default=auto select)", true);
 
 	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 	PRINT_MODULE_USAGE_COMMAND_DESCR("reset", "Reset GPS device");
@@ -1266,6 +1281,9 @@ GPS *GPS::instantiate(int argc, char *argv[], Instance instance)
 
 			} else if (!strcmp(myoptarg, "eml")) {
 				mode = GPS_DRIVER_MODE_EMLIDREACH;
+
+			} else if (!strcmp(myoptarg, "nmea")) {
+				mode = GPS_DRIVER_MODE_NMEA;
 #endif // CONSTRAINED_FLASH
 			} else {
 				PX4_ERR("unknown protocol: %s", myoptarg);
